@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag-postgres
+    environment:
+      POSTGRES_DB: ragdb
+      POSTGRES_USER: abdoozil
+      POSTGRES_PASSWORD: abdoozil
+    ports:
+      - "5432:5432"
+    volumes:
+      - rag_pg_data:/var/lib/postgresql/data
+
+#  ollama:
+#    image: ollama/ollama:latest
+#    container_name: rag-ollama
+#    ports:
+#      - "11434:11434"
+#    volumes:
+#      - rag_ollama_data:/root/.ollama
+#    # After it's up, pull the models used in application.yml:
+#    #   docker exec -it rag-ollama ollama pull llama3.1
+#    #   docker exec -it rag-ollama ollama pull nomic-embed-text
+
+volumes:
+  rag_pg_data:
+#  rag_ollama_data:

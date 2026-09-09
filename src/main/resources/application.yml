@@ -1,0 +1,42 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: spring-ai-rag-demo
+
+  # --- PGVector (Postgres + pgvector extension) ---
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ragdb
+    username: abdoozil
+    password: abdoozil
+    driver-class-name: org.postgresql.Driver
+
+  ai:
+    # --- Ollama: local LLM (chat) + local embedding model ---
+    # Note: Spring AI 2.0 dropped the ".options" segment from these property paths
+    # (e.g. chat.options.model -> chat.model). See the Upgrade Notes "Configuration
+    # Properties Flattening" section.
+    ollama:
+      base-url: http://localhost:11434
+#      chat:
+#        model: llama3.2:1b
+#        temperature: 0.3
+      chat:
+        model: gpt-oss:120b-cloud
+        temperature: 0.3
+      embedding:
+        model: nomic-embed-text:latest
+
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768        # must match the embedding model's output dimension
+        initialize-schema: true
+        schema-validation: true
+
+logging:
+  level:
+    org.springframework.ai: INFO
+    com.abdelhak.ragdemo: DEBUG
