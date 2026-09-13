@@ -1,39 +1,53 @@
 package com.abdelhak.ragdemo.config;
 
+import com.abdelhak.ragdemo.entities.User;
+import com.abdelhak.ragdemo.repository.UserRepository;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.core.context.SecurityContextHolder;
 
-/**
- * Wires up two flavors of RAG, both driven by the same PGVector VectorStore:
- *
- *  1) "simpleChatClient" -> QuestionAnswerAdvisor      (naive RAG, one-shot similarity search + prompt stuffing)
- *  2) "chatClient"        -> RetrievalAugmentationAdvisor (modular RAG: retriever + contextual query augmenter,
- *                                                          easy to extend with query transformers/expanders later)
- *
- * See: https://docs.spring.io/spring-ai/reference/api/retrieval-augmented-generation.html
- */
+import java.util.function.Supplier;
+
 @Configuration
 public class RagConfig {
 
     @Bean
-    public ChatClient chatClient(ChatModel chatModel, VectorStore vectorStore) {
+    public String chatModelName(@org.springframework.beans.factory.annotation.Value("${spring.ai.ollama.chat.model}") String modelName) {
+        return modelName;
+    }
+
+    @Bean
+    public ChatClient chatClient(ChatModel chatModel, VectorStore vectorStore, UserRepository userRepository) {
+
+        Supplier<Filter.Expression> currentUserFilter = () -> {
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            String email = authentication != null ? (String) authentication.getPrincipal() : null;
+
+            User user = email != null ? userRepository.findByEmail(email).orElse(null) : null;
+
+            // No authenticated user resolved: filter on a value that matches nothing,
+            // rather than falling back to an unfiltered (cross-user) search.
+            String userId = user != null ? user.getId().toString() : "unauthenticated";
+
+            return new FilterExpressionBuilder().eq("userId", userId).build();
+        };
 
         var documentRetriever = VectorStoreDocumentRetriever.builder()
                 .vectorStore(vectorStore)
                 .similarityThreshold(0.50)
                 .topK(6)
+                .filterExpression(currentUserFilter)
                 .build();
 
         var queryAugmenter = ContextualQueryAugmenter.builder()
-                // Instead of refusing to answer, we allow the model to fall back on general
-                // knowledge if nothing relevant was retrieved. Flip to false for stricter RAG.
                 .allowEmptyContext(true)
                 .build();
 
@@ -49,21 +63,6 @@ public class RagConfig {
                         the answer, say so clearly instead of making things up.
                         """)
                 .defaultAdvisors(retrievalAugmentationAdvisor)
-                .build();
-    }
-
-    /**
-     * Simpler alternative kept for reference / comparison: the naive QuestionAnswerAdvisor
-     * flow described first in the Spring AI docs. Not exposed as a REST endpoint by default,
-     * but you can inject it wherever you want to compare behavior against the advanced flow.
-     */
-    @Bean
-    public ChatClient simpleChatClient(ChatModel chatModel, VectorStore vectorStore) {
-        var qaAdvisor = QuestionAnswerAdvisor.builder(vectorStore)
-                .build();
-
-        return ChatClient.builder(chatModel)
-                .defaultAdvisors(qaAdvisor)
                 .build();
     }
 }

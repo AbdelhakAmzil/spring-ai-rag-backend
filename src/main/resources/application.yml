@@ -16,6 +16,12 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
 
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+
   # --- PGVector (Postgres + pgvector extension) ---
   datasource:
     url: jdbc:postgresql://localhost:5432/ragdb
@@ -51,3 +57,7 @@ logging:
   level:
     org.springframework.ai: INFO
     com.abdelhak.ragdemo: DEBUG
+
+jwt:
+  secret: "ChangeThisToALongRandomSecretKeyOfAtLeast256BitsForHS256Algorithm123"
+  expiration-ms: 86400000  # 24h
